@@ -1,4 +1,4 @@
-unix-time-machine
+Unix (rsync based) Time Machine
 =================
 
 Rsync-based Time Machine backup utility
