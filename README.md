@@ -5,7 +5,7 @@ Rsync-based Time Machine backup utility
 
 Why
 =================
-I was using Mac OS X Time Machine over Wi-Fi to backup my laptop hard drive
+I was using Mac OS X Time Machine to backup my laptop hard drive over Wi-Fi
 to home Linux server used as NAS. It wasn't very stable requiring me to
 repair occasionally broken Time Machine image every 2-3 months. Moreover, I
 had to recreate sparse backup image every 4-6 months due to unrecoverable
