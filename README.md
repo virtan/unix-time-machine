@@ -34,4 +34,5 @@ In my case (256Gb disk, 200Gb used) incremental copy takes 6-30Gb of disk
 1. Ensure that root (configurable) user can ssh to server by key.
 2. Change settings in utm script.
 3. ```# install -o root -g root -m 700 utm /usr/bin/utm```
-```# ( crontab -u root -l ; echo "20 * * * * /usr/bin/utm >>/var/log/utm-run.log 2>&1" ) | crontab -u root -```
+```# ( crontab -u root -l ; echo "20 * * * * /usr/bin/utm >>/var/log/utm-run.log 2>&1" ) \```
+```  | crontab -u root -```
