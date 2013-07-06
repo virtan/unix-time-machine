@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# Settings
+
+SERVER="192.168.1.177"
+SERVER_BACKUP_DIR="/room2/prophet-backups"
+NUMBER_OF_BACKUPS=10
+BACKUP_EVERY="3d"
+LOG="/var/log/utm.log"
+SERVER_USER="root"
+PID_FILE="/var/run/utm.pid"
+HOME_WIFI="Virtan WiFi"
+
+
+# Internals
+
+DATE=`date "+%Y-%m-%d,%H:%M:%S"`
+DAY_BEFORE=`date -v-$BACKUP_EVERY "+%Y-%m-%d,%H:%M:%S"`
+SSID=`/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I | grep " SSID:" | cut -d ':' -f2- | cut -d ' ' -f 2-`
+SERVER_ACCESSIBLE=`/sbin/ping -c 1 -t 1 $SERVER >/dev/null && echo "1" || echo "0"`
+PID=`cat $PID_FILE 2>/dev/null`
+PID_ALIVE=`ps $PID >/dev/null 2>&1 && echo "1" || echo "0"`
+
+if [ "$PID" -a "X$PID_ALIVE" = "X1" ] ; then
+    echo "$DATE there is already running instance (Pid: $PID)" >> $LOG
+    exit 0
+fi
+echo "$$" > $PID_FILE
+if [ "X`cat $PID_FILE`" != "X$$" ] ; then
+    # race condition
+    exit 0
+fi
+
+if [ "X$SSID" != "X$HOME_WIFI" -o "X$SERVER_ACCESSIBLE" != "X1" ] ; then
+    echo "$DATE we're not at home, can't backup (WiFi: $SSID, Server accessible: $SERVER_ACCESSIBLE)" >> $LOG
+    rm -f $PID_FILE
+    exit 0
+fi
+
+INCOMPLETE=`ssh $SERVER_USER@$SERVER ls -1 $SERVER_BACKUP_DIR/ | grep "^incomplete-" | tr '\n' ' '`
+if [ "$INCOMPLETE" ] ; then
+    echo "$DATE removing incomplete backups ($INCOMPLETE)" >> $LOG
+    ssh $SERVER_USER@$SERVER "cd $SERVER_BACKUP_DIR && rm -rf $INCOMPLETE"
+fi
+
+LAST=`ssh $SERVER_USER@$SERVER ls -1 $SERVER_BACKUP_DIR/ | grep "^[0-9,:-]*$" | tail -n 1 | tr '\n' ' '`
+if [ "X$DAY_BEFORE" "<" "X$LAST" ] ; then
+    rm -f $PID_FILE
+    exit 0
+fi
+
+sudo nice -n 15 /opt/local/bin/rsync -a \
+      --delete \
+      --delete-excluded \
+      --exclude-from=/etc/rsync-exclude \
+      --link-dest=../$LAST \
+      --rsh=ssh \
+      / $SERVER_USER@$SERVER:$SERVER_BACKUP_DIR/incomplete-$DATE \
+      && ssh $SERVER_USER@$SERVER \
+      "mv $SERVER_BACKUP_DIR/incomplete-$DATE $SERVER_BACKUP_DIR/$DATE" \
+      && echo "$DATE backup $DATE created successfully" >> $LOG
+
+TO_DELETE=`ssh $SERVER_USER@$SERVER ls -1r $SERVER_BACKUP_DIR/ | grep "^[0-9,:-]*$" | tail -n +$NUMBER_OF_BACKUPS | tr '\n' ' '`
+if [ "$TO_DELETE" ] ; then
+    echo "$DATE removing old backups ($TO_DELETE)" >> $LOG
+    ssh $SERVER_USER@$SERVER "cd $SERVER_BACKUP_DIR && rm -rf $TO_DELETE"
+fi
+
+rm -f $PID_FILE
